@@ -278,6 +278,9 @@ addr = "0.0.0.0" if not args.addr else args.addr
 port = 8050 if not args.port else args.port
 DIRECTORY = args.directory
 
+if not os.path.isdir(DIRECTORY):
+    print("directory does not exist")
+    sys.exit(1)
 
 menu = make_dropdown_menu(DIRECTORY)
 
