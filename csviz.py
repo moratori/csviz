@@ -13,11 +13,8 @@ import dash_core_components as doc
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
 
-
 HEADER_COMMENT = "#"
 CSV_SPLITTER = ","
-
-
 
 def make_dropdown_menu(path):
 
@@ -140,7 +137,7 @@ class Graph(object):
             self.xaxis_title = xaxis_title[1:].strip()
             self.yaxis_title = yaxis_title[1:].strip()
 
-            stripped = graph_type[1:].strip()
+            stripped = graph_type[1:].strip().lower()
 
             if not stripped in self.GraphTypeIdentifier:
                 return
@@ -270,12 +267,12 @@ class Graph(object):
 
 argparser = argparse.ArgumentParser()
 argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
-argparser.add_argument("--addr", type=str, help="ip address to bind")
-argparser.add_argument("--port", type=int, help="port number to bind")
+argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
+argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
+argparser.add_argument("--width", type=int, default=1080, help="width for graph")
+argparser.add_argument("--height", type=int, default=800, help="height for graph")
 args = argparser.parse_args()
 
-addr = "0.0.0.0" if not args.addr else args.addr
-port = 8050 if not args.port else args.port
 DIRECTORY = args.directory
 
 if not os.path.isdir(DIRECTORY):
@@ -294,7 +291,7 @@ application.layout = html.Div([
         value=menu[0]["value"],
         multi=False),
     html.Button("更新", id="update-menu"),
-    doc.Graph(id="graph", style={"height": 562, "width": 1000, "margin": "auto"})],
+    doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],
 )
 
 
@@ -328,5 +325,5 @@ def update_menu(_):
     return make_dropdown_menu(DIRECTORY)
 
 
-application.run_server(debug=True, host=addr, port=port)
+application.run_server(debug=True, host=args.addr, port=args.port)
 
