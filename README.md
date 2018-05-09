@@ -35,10 +35,10 @@ $ conda env create --file requirements.txt
 
 ## Options
 
-- --addr: ip address to bind
-- --port: port number to bind
-- --width: width for graph
-- --height: height for graph
+- --addr "0.0.0.0": ip address to bind
+- --port 8050: port number to bind
+- --width 1080: width for graph
+- --height 800: height for graph
 
 ## Demo
 
