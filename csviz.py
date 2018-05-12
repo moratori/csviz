@@ -53,20 +53,21 @@ class Graph(object):
     """
 
     GraphTypeIdentifier = \
-        {"lines"   : (lambda title,x,y: 
-                        go.Scatter(x=x, y=y, mode="lines", name=title)),\
-         "bar"     : (lambda title,x,y: 
-                        go.Bar(x=x, y=y, name=title)),\
-         "scatter" : (lambda title,x,y: 
-                        go.Scatter(x=x, y=y, mode="markers", name=title))}
+        {"lines"   : (lambda title,x,y,axis: 
+                        go.Scatter(x=x, y=y, mode="lines", name=title, yaxis=axis)),\
+         "bar"     : (lambda title,x,y,axis: 
+                        go.Bar(x=x, y=y, name=title, yaxis=axis)),\
+         "scatter" : (lambda title,x,y,axis: 
+                        go.Scatter(x=x, y=y, mode="markers", name=title, yaxis=axis))}
+
+    Y2_INDICATES = "%"
+    PLACE_HOLDER = "_"
 
     def __init__(self, splitter, font_size):
 
-        self.place_holder = "_"
-
         self.graph_title = ""
         self.xaxis_title = ""
-        self.yaxis_title = ""
+        self.yaxis_title = []
         self.graph_types = []
         self.CSVSplitChar = splitter
         self.font_size = font_size
@@ -100,9 +101,9 @@ class Graph(object):
 
 
         for i,typ in enumerate(tmp):
-            if len(tmp) > 1 and i == 0 and typ != self.place_holder:
+            if len(tmp) > 1 and i == 0 and typ != self.PLACE_HOLDER:
                 return
-            if typ == self.place_holder: continue
+            if typ == self.PLACE_HOLDER: continue
             if not typ in self.GraphTypeIdentifier:
                 return
 
@@ -154,12 +155,11 @@ class Graph(object):
 
             self.graph_title = title[1:].strip()
             self.xaxis_title = xaxis_title[1:].strip()
-            self.yaxis_title = yaxis_title[1:].strip()
+            self.yaxis_title = [x.strip() for x in yaxis_title[1:].strip().split(self.CSVSplitChar)]
             self.graph_types = self.__parse_graph_types(graph_types)
 
             if not self.graph_types:
                 return
-
 
             self.column_title = self.__parse_column_title(column_name)
 
@@ -209,19 +209,27 @@ class Graph(object):
 
         traces = []
 
-
         for graph_type, column_title, column_data in zip(self.graph_types, self.column_title, self.column_datum):
+            if column_title == self.Y2_INDICATES:
+                return
+
+            axis = ("y2" if column_title.startswith(self.Y2_INDICATES) else "y1")
+            column_title = column_title[1:] if column_title.startswith(self.Y2_INDICATES) else column_title
+
             trace_maker = self.GraphTypeIdentifier[graph_type]
-            trace = trace_maker(column_title, self.x_data, column_data)
+            trace = trace_maker(column_title, self.x_data, column_data, axis)
             traces.append(trace)
 
         figure = {
             "data"  : traces,
             "layout": go.Layout(title=self.graph_title,
                                 xaxis={"title": self.xaxis_title},
-                                yaxis={"title": self.yaxis_title},
-                                font={"size":self.font_size})}
-
+                                yaxis={"title": self.yaxis_title[0]},
+                                yaxis2=({} if len(self.yaxis_title) == 1 else \
+                                        {"title": self.yaxis_title[1], "side":"right", "overlaying":"y"}),
+                                font={"size":self.font_size},
+                                legend={"orientation":"h", "font": {"size": int(0.85 * self.font_size)},
+                                        "yanchor":"middle"})}
 
         return figure
 
@@ -234,7 +242,7 @@ argparser.add_argument("--port", type=int, default=8050, help="port number to bi
 argparser.add_argument("--width", type=int, default=1080, help="width for graph")
 argparser.add_argument("--height", type=int, default=550, help="height for graph")
 argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
-argparser.add_argument("--fontsize", type=int, default=17, help="font size")
+argparser.add_argument("--fontsize", type=int, default=14, help="font size")
 args = argparser.parse_args()
 
 DIRECTORY = args.directory
@@ -249,14 +257,14 @@ menu = make_dropdown_menu(DIRECTORY)
 
 application = dash.Dash()
 application.layout = html.Div([
-    html.H1("統計情報"),
-    html.H4("データ読み込み先ディレクトリ: %s" %(DIRECTORY + "@" + socket.gethostname())),
+    html.H1("Statistical Information for Something System"),
+    html.H4("loading from: %s" %(DIRECTORY + "@" + socket.gethostname())),
     doc.Dropdown(
         id="graph_selection",
         options=menu,
         value=menu[0]["value"],
         multi=False),
-    html.Button("更新", id="update-menu"),
+    html.Button("reload files", id="update-menu"),
     doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],)
 
 
