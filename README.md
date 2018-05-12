@@ -38,7 +38,9 @@ $ conda env create --file requirements.txt
 - --addr "0.0.0.0": ip address to bind
 - --port 8050: port number to bind
 - --width 1080: width for graph
-- --height 800: height for graph
+- --height 550: height for graph
+- --delimiter ",": delimiter for csv
+- --fontsize 17: font size
 
 ## Demo
 
