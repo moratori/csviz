@@ -264,7 +264,7 @@ application.layout = html.Div([
         options=menu,
         value=menu[0]["value"],
         multi=False),
-    html.Button("reload files", id="update-menu"),
+    html.Button("reload file list", id="update-menu"),
     doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],)
 
 
