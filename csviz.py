@@ -1,49 +1,15 @@
 #!/usr/bin/env python3
 #coding:utf-8
 
-from enum import Enum, auto
 import sys
 import os
 import socket
 import argparse
-
 import dash
 import dash_html_components as html
 import dash_core_components as doc
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
-
-HEADER_COMMENT = "#"
-
-def make_dropdown_menu(path):
-
-    """
-    path 配下に存在する csv ファイル名からdropdown のメニューを作成する
-    """
-
-    files = os.listdir(path)
-    if not files:
-        sys.exit(1)
-
-    return [{"label": fname, "value": fname} for fname in files]
-
-
-
-def numstr_to_num(numstr):
-
-    """
-    CSVファイル中の、数を表す文字列をPythonの数オブジェクトに変換する
-    """
-
-    try:
-        int_val = int(numstr)
-        float_val = float(numstr)
-        if "." in numstr:
-            return float_val
-        return int_val
-    except:
-        return str(numstr)
-
 
 
 class Graph(object):
@@ -62,8 +28,9 @@ class Graph(object):
 
     Y2_INDICATES = "%"
     PLACE_HOLDER = "_"
+    HEADER_COMMENT = "#"
 
-    def __init__(self, splitter, font_size):
+    def __init__(self, splitter, font_size, bgcolor):
 
         self.graph_title = ""
         self.xaxis_title = ""
@@ -71,6 +38,7 @@ class Graph(object):
         self.graph_types = []
         self.CSVSplitChar = splitter
         self.font_size = font_size
+        self.bgcolor = bgcolor
 
         self.x_data = []
 
@@ -87,12 +55,29 @@ class Graph(object):
         for line in headers:
             if not line:
                 return False
-            if line[0] != HEADER_COMMENT:
+            if line[0] != self.HEADER_COMMENT:
                 return False
             if len(line.strip()) == 1:
                 return False
 
         return True
+
+    def __numstr_to_num(self, numstr):
+    
+        """
+        CSVファイル中の、数を表す文字列をPythonの数オブジェクトに変換する
+        """
+    
+        try:
+            int_val = int(numstr)
+            float_val = float(numstr)
+            if "." in numstr:
+                return float_val
+            return int_val
+        except:
+            return str(numstr)
+
+
 
     def __parse_graph_types(self, graph_types):
 
@@ -186,7 +171,7 @@ class Graph(object):
                 if len(row) != len(self.column_title) + 1:
                     return
 
-                numrow = list(map(numstr_to_num, row))
+                numrow = list(map(self.__numstr_to_num, row))
                 tmp_data.append(numrow)
                 x.append(numrow[0])
 
@@ -210,23 +195,35 @@ class Graph(object):
         traces = []
 
         for graph_type, column_title, column_data in zip(self.graph_types, self.column_title, self.column_datum):
+
             if column_title == self.Y2_INDICATES:
                 return
 
-            axis = ("y2" if column_title.startswith(self.Y2_INDICATES) else "y1")
-            column_title = column_title[1:] if column_title.startswith(self.Y2_INDICATES) else column_title
+            if column_title.startswith(self.Y2_INDICATES):
+                if len(self.yaxis_title) == 1:
+                    return
+                axis = "y2"
+                column_title = column_title[1:]
+            else:
+                axis = "y1"
 
             trace_maker = self.GraphTypeIdentifier[graph_type]
             trace = trace_maker(column_title, self.x_data, column_data, axis)
             traces.append(trace)
+
+        if len(self.yaxis_title) == 1:
+            yaxis2 = {}
+        else:
+            yaxis2 = {"title": self.yaxis_title[1], "side":"right", "overlaying":"y"}
 
         figure = {
             "data"  : traces,
             "layout": go.Layout(title=self.graph_title,
                                 xaxis={"title": self.xaxis_title},
                                 yaxis={"title": self.yaxis_title[0]},
-                                yaxis2=({} if len(self.yaxis_title) == 1 else \
-                                        {"title": self.yaxis_title[1], "side":"right", "overlaying":"y"}),
+                                yaxis2=yaxis2,
+                                paper_bgcolor=self.bgcolor,
+                                plot_bgcolor=self.bgcolor,
                                 font={"size":self.font_size},
                                 legend={"orientation":"h", "font": {"size": int(0.85 * self.font_size)},
                                         "yanchor":"middle"})}
@@ -235,68 +232,88 @@ class Graph(object):
 
 
 
-argparser = argparse.ArgumentParser()
-argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
-argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
-argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
-argparser.add_argument("--width", type=int, default=1080, help="width for graph")
-argparser.add_argument("--height", type=int, default=550, help="height for graph")
-argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
-argparser.add_argument("--fontsize", type=int, default=14, help="font size")
-args = argparser.parse_args()
-
-DIRECTORY = args.directory
-CSV_SPLITTER = args.delimiter
-FONT_SIZE = args.fontsize
-
-if not os.path.isdir(DIRECTORY):
-    print("directory does not exist")
-    sys.exit(1)
-
-menu = make_dropdown_menu(DIRECTORY)
-
-application = dash.Dash()
-application.layout = html.Div([
-    html.H1("Statistical Information for Something System"),
-    html.H4("loading from: %s" %(DIRECTORY + "@" + socket.gethostname())),
-    doc.Dropdown(
-        id="graph_selection",
-        options=menu,
-        value=menu[0]["value"],
-        multi=False),
-    html.Button("reload file list", id="update-menu"),
-    doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],)
-
-
-@application.callback(
-    Output("graph", "figure"),
-    [Input("graph_selection", "value")])
-def update_graph(value):
+def make_dropdown_menu(path):
 
     """
-    指定ディレクトリ配下のCSVファイルを読み込み、グラフを描画する
+    path 配下に存在する csv ファイル名からdropdown のメニューを作成する
     """
 
-    if (not value) or (".." in value) or ("/" in value):
-        return
+    files = os.listdir(path)
+    if not files:
+        print("directory does not contain any files")
+        sys.exit(1)
 
-    graph = Graph(CSV_SPLITTER, FONT_SIZE)
-    graph.load_dataset_file(os.path.join(DIRECTORY, value))
-
-    return graph.make_graph()
-
-
-@application.callback(
-    Output("graph_selection", "options"),
-    [Input("update-menu", "n_clicks")])
-def update_menu(_):
-
-    """
-    指定ディレクトリ配下のファイルから、ドロップダウンメニューを再作成する
-    """
-
-    return make_dropdown_menu(DIRECTORY)
+    return [{"label": fname, "value": fname} for fname in files]
 
 
-application.run_server(debug=True, host=args.addr, port=args.port)
+def setup_command_line_argument_parser():
+
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
+    argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
+    argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
+    argparser.add_argument("--width", type=int, default=1080, help="width for graph")
+    argparser.add_argument("--height", type=int, default=590, help="height for graph")
+    argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
+    argparser.add_argument("--fontsize", type=int, default=14, help="font size")
+    argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
+    argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
+    args = argparser.parse_args()
+
+    return args
+
+
+
+if __name__ == "__main__":
+    args = setup_command_line_argument_parser()
+
+    if not os.path.isdir(args.directory):
+        print("directory does not exist")
+        sys.exit(1)
+
+    menu = make_dropdown_menu(args.directory)
+
+    application = dash.Dash()
+    application.layout = html.Div([
+        html.H1(args.apptitle),
+        html.H4("loading from: %s" %(args.directory + "@" + socket.gethostname())),
+        doc.Dropdown(
+            id="graph_selection",
+            options=menu,
+            value=menu[0]["value"],
+            multi=False),
+        html.Button("reload file list", id="update-menu"),
+        doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],)
+
+
+    @application.callback(
+        Output("graph", "figure"),
+        [Input("graph_selection", "value")])
+    def update_graph(value):
+
+        """
+        指定ディレクトリ配下のCSVファイルを読み込み、グラフを描画する
+        """
+
+        if (not value) or (".." in value) or ("/" in value):
+            return
+
+        graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
+        graph.load_dataset_file(os.path.join(args.directory, value))
+
+        return graph.make_graph()
+
+
+    @application.callback(
+        Output("graph_selection", "options"),
+        [Input("update-menu", "n_clicks")])
+    def update_menu(_):
+
+        """
+        指定ディレクトリ配下のファイルから、ドロップダウンメニューを再作成する
+        """
+
+        return make_dropdown_menu(args.directory)
+
+    application.run_server(debug=True, host=args.addr, port=args.port)
 
