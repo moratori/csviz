@@ -5,6 +5,7 @@ import sys
 import os
 import socket
 import argparse
+import datetime
 import dash
 import dash_html_components as html
 import dash_core_components as doc
@@ -258,6 +259,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--fontsize", type=int, default=14, help="font size")
     argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
     argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
+    argparser.add_argument("--graphcache", type=int, default=5, help="caching time for graph object")
     args = argparser.parse_args()
 
     return args
@@ -271,6 +273,8 @@ if __name__ == "__main__":
         print("directory does not exist")
         sys.exit(1)
 
+    GraphCache = {}
+
     menu = make_dropdown_menu(args.directory)
 
     application = dash.Dash()
@@ -283,7 +287,10 @@ if __name__ == "__main__":
             value=menu[0]["value"],
             multi=False),
         html.Button("reload file list", id="update-menu"),
-        doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})],)
+        doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"}),
+        html.H3("Raw Data Table"),
+        html.Table(id="rawdata", style={"margin":"auto", "textAlign":"center", "bgcolor":"#ffffee"})
+    ],)
 
 
     @application.callback(
@@ -298,11 +305,45 @@ if __name__ == "__main__":
         if (not value) or (".." in value) or ("/" in value):
             return
 
-        graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
-        graph.load_dataset_file(os.path.join(args.directory, value))
+        current_time = datetime.datetime.now()
+        cache = GraphCache.get(value, None)
+        isold = True if not cache else (current_time - cache[0]) > datetime.timedelta(seconds=args.graphcache)
+
+        if isold:
+            graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
+            graph.load_dataset_file(os.path.join(args.directory, value))
+            GraphCache[value] = (current_time, graph)
+        else:
+            graph = cache[1]
 
         return graph.make_graph()
 
+    @application.callback(
+        Output("rawdata", "children"),
+        [Input("graph_selection", "value")])
+    def update_table(value):
+
+        if (not value) or (".." in value) or ("/" in value):
+            return
+
+        current_time = datetime.datetime.now()
+        cache = GraphCache.get(value, None)
+        isold = True if not cache else (current_time - cache[0]) > datetime.timedelta(seconds=args.graphcache)
+
+        if isold:
+            graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
+            graph.load_dataset_file(os.path.join(args.directory, value))
+            GraphCache[value] = (current_time, graph)
+        else:
+            graph = cache[1]
+
+        contents = []
+        contents.append(html.Tr([html.Th("_")]  + [html.Th(each) for each in graph.column_title]))
+
+        for i, row in enumerate(list(map(list, zip(*graph.column_datum)))):
+            contents.append(html.Tr([html.Td(graph.x_data[i])] + [html.Td(x) for x in row]))
+
+        return contents
 
     @application.callback(
         Output("graph_selection", "options"),
