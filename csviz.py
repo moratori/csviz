@@ -227,7 +227,7 @@ class Graph(object):
                                 plot_bgcolor=self.bgcolor,
                                 font={"size":self.font_size},
                                 legend={"orientation":"h", "font": {"size": int(0.85 * self.font_size)},
-                                        "yanchor":"middle"})}
+                                        "yanchor":"top"})}
 
         return figure
 

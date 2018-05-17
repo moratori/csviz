@@ -1,4 +1,4 @@
-name: graph-test
+name: csviz
 channels:
   - defaults
 dependencies:
@@ -48,5 +48,5 @@ dependencies:
     - traitlets==4.3.2
     - urllib3==1.22
     - werkzeug==0.14.1
-prefix: /home/user/anaconda3/envs/graph-test
+prefix: /home/user/anaconda3/envs/csviz
 
