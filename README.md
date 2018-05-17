@@ -27,7 +27,7 @@ $ conda env create --file requirements.txt
 2. run the script __csviz.py__ with argument __directory__
 
    ```
-   (graph-test) $ python csviz.py directory
+   (csviz) $ python csviz.py directory
    ```
 
 3. access to __localhost__:8050
