@@ -41,6 +41,9 @@ $ conda env create --file requirements.txt
 - --height 550: height for graph
 - --delimiter ",": delimiter for csv
 - --fontsize 17: font size
+- --bgcolor "ffe": graph baclground color
+- --apptitle "Statistical Information for Something System": title of app
+- --graphcache 5: cache time for graph object
 
 ## Demo
 
