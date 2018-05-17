@@ -47,5 +47,4 @@ $ conda env create --file requirements.txt
 
 ## Demo
 
-TBD
-
+[https://stats.mtcq.jp/](https://stats.mtcq.jp/)
