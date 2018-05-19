@@ -44,7 +44,7 @@ $ conda env create --file requirements.txt
 - --fontsize 17: font size
 - --bgcolor "ffe": graph baclground color
 - --apptitle "Statistical Information for Something System": title of app
-- --graphcache 5: cache time for graph object
+- --interval 3: interval for live update
 - --public False: disable hostname display
 
 ## Demo
