@@ -260,6 +260,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
     argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
     argparser.add_argument("--graphcache", type=int, default=5, help="caching time for graph object")
+    argparser.add_argument("--public", action="store_true", help="disable hostname display")
     args = argparser.parse_args()
 
     return args
@@ -277,10 +278,12 @@ if __name__ == "__main__":
 
     menu = make_dropdown_menu(args.directory)
 
+    hostname = "" if args.public else "loading from: %s" %(args.directory + "@" + socket.gethostname())
+
     application = dash.Dash()
     application.layout = html.Div([
         html.H1(args.apptitle),
-        html.H4("loading from: %s" %(args.directory + "@" + socket.gethostname())),
+        html.H4(hostname),
         doc.Dropdown(
             id="graph_selection",
             options=menu,
