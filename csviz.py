@@ -6,6 +6,7 @@ import os
 import socket
 import argparse
 import datetime
+import hashlib
 import dash
 import dash_html_components as html
 import dash_core_components as doc
@@ -259,7 +260,6 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--fontsize", type=int, default=14, help="font size")
     argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
     argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
-    argparser.add_argument("--public", action="store_true", help="disable hostname display")
     args = argparser.parse_args()
 
     return args
@@ -275,24 +275,33 @@ if __name__ == "__main__":
 
     menu = make_dropdown_menu(args.directory)
 
-    hostname = "" if args.public else "loading from: %s" %(args.directory + "@" + socket.gethostname())
-
     application = dash.Dash()
     application.layout = html.Div([
-        html.H1(args.apptitle),
-        html.H4(hostname),
+        html.H1(args.apptitle,style={"textAlign":"center"}),
+        html.Div([
+
+        html.Div([
         doc.Dropdown(
             id="graph_selection",
             options=menu,
-            value=menu[0]["value"],
-            multi=False),
-        html.Button("reload file list", id="update-menu"),
-        doc.Graph(id="graph", style={"height": args.height, "width": args.width, "margin": "auto"})
+            value=[menu[0]["value"]],
+            multi=True),
+        html.Button("reload list", id="update-menu")
+        ],style={"width":args.width, 
+                 "margin-left":"auto",
+                 "margin-right":"auto",
+                 "margin-top": "3%"}),
+
+        html.Div(id="graphs")
+        ],style={"width": args.width+50, 
+                 "margin":"auto",
+                 "border": "1px solid #eee",
+                 "boxShadow" : "0px 0px 3px"})
     ],)
 
 
     @application.callback(
-        Output("graph", "figure"),
+        Output("graphs", "children"),
         [Input("graph_selection", "value")])
     def update_graph(value):
 
@@ -300,13 +309,29 @@ if __name__ == "__main__":
         指定ディレクトリ配下のCSVファイルを読み込み、グラフを描画する
         """
 
-        if (not value) or (".." in value) or ("/" in value):
-            return
+        graphs = []
 
-        graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
-        graph.load_dataset_file(os.path.join(args.directory, value))
+        for each in value:
 
-        return graph.make_graph()
+            if (not each) or (".." in each) or ("/" in each):
+                return
+
+            graph_id = hashlib.md5(each.encode("utf-8")).hexdigest()
+
+            graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
+            graph.load_dataset_file(os.path.join(args.directory, each))
+
+            graph_obj = doc.Graph(id=graph_id,
+                                  figure=graph.make_graph(),
+                                  style={"height": args.height, 
+                                         "width": args.width, 
+                                         "margin-top": "18px",
+                                         "margin-left":"auto",
+                                         "margin-right":"auto"})
+
+            graphs.append(graph_obj)
+
+        return graphs
 
     @application.callback(
         Output("graph_selection", "options"),
