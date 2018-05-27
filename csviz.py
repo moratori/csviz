@@ -36,6 +36,7 @@ class Graph(object):
 
         self.graph_title = ""
         self.xaxis_title = ""
+        self.xaxis_slider = False
         self.yaxis_title = []
         self.graph_types = []
         self.CSVSplitChar = splitter
@@ -114,6 +115,24 @@ class Graph(object):
 
         return column_title_row[1:]
 
+    def __parse_xaxis_title(self, xaxis_title):
+
+        subcommand_sep = ":"
+        rangeslider = "rangeslider"
+
+        if subcommand_sep in xaxis_title:
+            flag = False
+            title = ""
+            first_half, last_half = [each.strip() for each in xaxis_title.split(subcommand_sep)]
+            if last_half == rangeslider:
+                flag = True
+                title = first_half
+            else:
+                title = xaxis_title
+            return flag, title
+        else:
+            return False, xaxis_title
+
 
 
     def load_dataset_file(self, file_path):
@@ -141,7 +160,7 @@ class Graph(object):
                 column_name]): return
 
             self.graph_title = title[1:].strip()
-            self.xaxis_title = xaxis_title[1:].strip()
+            self.xaxis_slider, self.xaxis_title = self.__parse_xaxis_title(xaxis_title[1:].strip())
             self.yaxis_title = [x.strip() for x in yaxis_title[1:].strip().split(self.CSVSplitChar)]
             self.graph_types = self.__parse_graph_types(graph_types)
 
@@ -221,7 +240,8 @@ class Graph(object):
         figure = {
             "data"  : traces,
             "layout": go.Layout(title=self.graph_title,
-                                xaxis={"title": self.xaxis_title},
+                                xaxis=({"title": self.xaxis_title} if not self.xaxis_slider else
+                                       {"title": self.xaxis_title,"rangeslider":{}}),
                                 yaxis={"title": self.yaxis_title[0]},
                                 yaxis2=yaxis2,
                                 paper_bgcolor=self.bgcolor,
