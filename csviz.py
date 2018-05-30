@@ -331,7 +331,7 @@ if __name__ == "__main__":
 
         graphs = []
 
-        for each in value:
+        for each in reversed(value):
 
             if (not each) or (".." in each) or ("/" in each):
                 return
