@@ -44,6 +44,8 @@ $ conda env create --file requirements.txt
 - --fontsize 17: font size
 - --bgcolor "ffe": graph baclground color
 - --apptitle "Statistical Information for Something System": title of app
+- --debug : debug mode
+- --showtoolbar : show flooting tool bar
 
 ## Demo
 

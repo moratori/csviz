@@ -31,6 +31,7 @@ class Graph(object):
     Y2_INDICATES = "%"
     PLACE_HOLDER = "_"
     HEADER_COMMENT = "#"
+    RANGESLIDER = "rangeslider"
 
     def __init__(self, splitter, font_size, bgcolor):
 
@@ -118,13 +119,12 @@ class Graph(object):
     def __parse_xaxis_title(self, xaxis_title):
 
         subcommand_sep = ":"
-        rangeslider = "rangeslider"
 
         if subcommand_sep in xaxis_title:
             flag = False
             title = ""
             first_half, last_half = [each.strip() for each in xaxis_title.split(subcommand_sep)]
-            if last_half == rangeslider:
+            if last_half == self.RANGESLIDER:
                 flag = True
                 title = first_half
             else:
@@ -186,7 +186,7 @@ class Graph(object):
             for line in handle:
                 st = line.strip()
                 if st == "":
-                    break
+                    continue
                 row = st.split(self.CSVSplitChar)
 
                 if len(row) != len(self.column_title) + 1:
@@ -233,22 +233,23 @@ class Graph(object):
             traces.append(trace)
 
         if len(self.yaxis_title) == 1:
-            yaxis2 = {}
+            yaxis2 = dict()
         else:
-            yaxis2 = {"title": self.yaxis_title[1], "side":"right", "overlaying":"y"}
+            yaxis2 = dict(title = self.yaxis_title[1], side = "right", overlaying = "y")
 
-        figure = {
-            "data"  : traces,
-            "layout": go.Layout(title=self.graph_title,
+        figure = dict(
+            data = traces,
+            layout = go.Layout(title=self.graph_title,
                                 xaxis=({"title": self.xaxis_title} if not self.xaxis_slider else
-                                       {"title": self.xaxis_title,"rangeslider":{}}),
-                                yaxis={"title": self.yaxis_title[0]},
+                                       {"title": self.xaxis_title,self.RANGESLIDER:{}}),
+                                yaxis=dict(title = self.yaxis_title[0]),
                                 yaxis2=yaxis2,
                                 paper_bgcolor=self.bgcolor,
                                 plot_bgcolor=self.bgcolor,
-                                font={"size":self.font_size},
-                                legend={"orientation":"h", "font": {"size": int(0.85 * self.font_size)},
-                                        "yanchor":"middle"})}
+                                font=dict(size=self.font_size),
+                                legend=dict(orientation = "h", 
+                                            font = dict(size = int(0.85 * self.font_size)),
+                                            yanchor="middle")))
 
         return figure
 
@@ -265,7 +266,7 @@ def make_dropdown_menu(path):
         print("directory does not contain any files")
         sys.exit(1)
 
-    return [{"label": fname, "value": fname} for fname in files]
+    return [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
 
 
 def setup_command_line_argument_parser():
@@ -280,6 +281,9 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--fontsize", type=int, default=14, help="font size")
     argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
     argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
+    argparser.add_argument("--debug", action="store_true", help="setting for debug mode")
+    argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
+
     args = argparser.parse_args()
 
     return args
@@ -297,7 +301,15 @@ if __name__ == "__main__":
 
     application = dash.Dash()
     application.layout = html.Div([
-        html.H1(args.apptitle,style={"textAlign":"center"}),
+
+        html.Div([
+            html.H1(args.apptitle, style=dict(textAlign="left")),
+        ],style=dict(width=args.width+50,
+                     fontFamily="Helvetica , 游ゴシック, sans-serif",
+                     fontSize="18",
+                     marginLeft="auto",
+                     marginRight="auto")),
+
         html.Div([
 
         html.Div([
@@ -307,17 +319,17 @@ if __name__ == "__main__":
             value=[menu[0]["value"]],
             multi=True),
         html.Button("reload list", id="update-menu")
-        ],style={"width":args.width, 
-                 "margin-left":"auto",
-                 "margin-right":"auto",
-                 "margin-top": "3%"}),
+        ],style=dict(width=args.width, 
+                     marginLeft="auto",
+                     marginRight="auto",
+                     marginTop="2%")),
 
         html.Div(id="graphs")
-        ],style={"width": args.width+50, 
-                 "margin":"auto",
-                 "border": "1px solid #eee",
-                 "boxShadow" : "0px 0px 3px"})
-    ],)
+        ],style=dict(width=args.width+50, 
+                     margin="auto",
+                     paddingBottom="1%",
+                     border="1px solid #eee",
+                     boxShadow = "0px 0px 3px"))])
 
 
     @application.callback(
@@ -343,11 +355,12 @@ if __name__ == "__main__":
 
             graph_obj = doc.Graph(id=graph_id,
                                   figure=graph.make_graph(),
-                                  style={"height": args.height, 
-                                         "width": args.width, 
-                                         "margin-top": "18px",
-                                         "margin-left":"auto",
-                                         "margin-right":"auto"})
+                                  style=dict(height = args.height, 
+                                             width=args.width, 
+                                             marginTop= "18px",
+                                             marginLeft="auto",
+                                             marginRight="auto"),
+                                  config=dict(displayModeBar=args.showtoolbar))
 
             graphs.append(graph_obj)
 
@@ -364,5 +377,5 @@ if __name__ == "__main__":
 
         return make_dropdown_menu(args.directory)
 
-    application.run_server(debug=True, host=args.addr, port=args.port)
+    application.run_server(debug=args.debug, host=args.addr, port=args.port)
 
