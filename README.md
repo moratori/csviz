@@ -48,6 +48,7 @@ $ conda env create --file requirements.txt
 - --apptitle "Statistical Information for Something System": title of app
 - --debug : debug mode
 - --showtoolbar : show flooting tool bar
+- --offline: disable loading resources from CDN
 
 ## Demo
 
