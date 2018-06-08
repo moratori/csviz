@@ -285,6 +285,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
     argparser.add_argument("--debug", action="store_true", help="setting for debug mode")
     argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
+    argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
 
     args = argparser.parse_args()
 
@@ -304,6 +305,9 @@ if __name__ == "__main__":
     application = dash.Dash()
 
     application.title = args.apptitle
+    application.css.config.serve_locally = args.offline
+    application.scripts.config.serve_locally = args.offline
+
     application.layout = html.Div([
 
         html.Div([
@@ -352,12 +356,10 @@ if __name__ == "__main__":
             if (not each) or (".." in each) or ("/" in each):
                 return
 
-            graph_id = hashlib.md5(each.encode("utf-8")).hexdigest()
-
             graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
             graph.load_dataset_file(os.path.join(args.directory, each))
 
-            graph_obj = doc.Graph(id=graph_id,
+            graph_obj = doc.Graph(id=hashlib.md5(each.encode("utf-8")).hexdigest(),
                                   figure=graph.make_graph(),
                                   style=dict(height = args.height, 
                                              width=args.width, 
