@@ -5,6 +5,7 @@
 ## Installation
 
 ```shell
+$ git clone https://github.com/moratori/csviz.git
 $ conda env create --file requirements.txt
 ```
 
