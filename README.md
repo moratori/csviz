@@ -1,5 +1,7 @@
 # CSVIZ; A Simple CSV data Visualizer
 
+![sample-image1](https://mtcq.jp/images/3737459363.jpeg)
+
 ## Installation
 
 ```shell
@@ -32,7 +34,7 @@ $ conda env create --file requirements.txt
 
 3. access to __localhost__:8050
 
-   ![sample-image](https://mtcq.jp/images/3735713966.jpeg)
+   ![sample-image2](https://mtcq.jp/images/3735713966.jpeg)
 
 ## Options
 
