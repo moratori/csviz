@@ -249,7 +249,9 @@ class Graph(object):
                                 font=dict(size=self.font_size),
                                 legend=dict(orientation = "h", 
                                             font = dict(size = int(0.85 * self.font_size)),
-                                            yanchor="middle")))
+                                            yanchor="top",
+                                            x=0,
+                                            y=1.1)))
 
         return figure
 
