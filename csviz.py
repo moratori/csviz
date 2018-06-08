@@ -302,6 +302,8 @@ if __name__ == "__main__":
     menu = make_dropdown_menu(args.directory)
 
     application = dash.Dash()
+
+    application.title = args.apptitle
     application.layout = html.Div([
 
         html.Div([
