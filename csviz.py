@@ -7,6 +7,8 @@ import argparse
 import hashlib
 import logging
 import logging.handlers
+from abc import ABCMeta, abstractmethod
+from enum import Enum, auto
 
 import dash
 import dash_html_components as html
@@ -64,65 +66,74 @@ def setup_logging(log_file_path):
     return 
 
 
+class GraphTypes(Enum):
 
-class Graph(object):
+    Lines = auto()
+    Bar = auto()
+    Scatter = auto()
 
-    """
-    グラフを描画するために必要な諸々の情報を保持するクラス
-    """
 
-    GraphTypeIdentifier = \
-        {"lines"   : (lambda title,x,y,axis: 
-                        go.Scatter(x=x, y=y, mode="lines", name=title, yaxis=axis)),\
-         "bar"     : (lambda title,x,y,axis: 
-                        go.Bar(x=x, y=y, name=title, yaxis=axis)),\
-         "scatter" : (lambda title,x,y,axis: 
-                        go.Scatter(x=x, y=y, mode="markers", name=title, yaxis=axis))}
+class GraphDatum(object):
 
-    Y2_INDICATES = "%"
-    PLACE_HOLDER = "_"
-    HEADER_COMMENT = "#"
-    RANGESLIDER = "rangeslider"
-
-    def __init__(self, splitter, font_size, bgcolor):
+    def __init__(self):
 
         self.graph_title = ""
         self.xaxis_title = ""
         self.xaxis_slider = False
         self.yaxis_title = []
         self.graph_types = []
-        self.CSVSplitChar = splitter
-        self.font_size = font_size
-        self.bgcolor = bgcolor
+        self.font_size = 0
+        self.bgcolor = ""
 
         self.x_data = []
-
         self.column_title = []
         self.column_datum = []
 
+
+class DataLoader(metaclass=ABCMeta):
+
+    @abstractmethod
+    def setup_load(self):
+        pass
+
+    @abstractmethod
+    def load(self):
+        pass
+
+
+class CSVFileLoader(DataLoader):
+
+    Y2_INDICATES = "%"
+    PLACE_HOLDER = "_"
+    HEADER_COMMENT = "#"
+    RANGESLIDER = "rangeslider"
+    SUBCOMMAND_SEP = ":"
+    GRAPH_TYPES_CONVERTER = {"lines"  : GraphTypes.Lines, 
+                             "bar"    : GraphTypes.Bar, 
+                             "scatter": GraphTypes.Scatter}
+
+    def __init__(self, filepath, delimiter):
+        self.filepath  = filepath
+        self.delimiter = delimiter
+        self.datum = GraphDatum()
+
     def __csv_header_check(self, headers):
-    
-        """
-        csvファイルのヘッダ部分をチェックする
-        headers の各行が COMMENT で始まるかを確認する
-        """
     
         for line in headers:
             if not line:
+                LOGGER.warn("empty line found while header")
                 return False
             if line[0] != self.HEADER_COMMENT:
+                LOGGER.warn("assumed comment character for header does not exist \"%s\"" %str(line[0]))
                 return False
             if len(line.strip()) == 1:
+                LOGGER.warn("too short hedaer line")
                 return False
 
         return True
 
     def __numstr_to_num(self, numstr):
-    
-        """
-        CSVファイル中の、数を表す文字列をPythonの数オブジェクトに変換する
-        """
-    
+
         try:
             int_val = int(numstr)
             float_val = float(numstr)
@@ -132,49 +143,50 @@ class Graph(object):
         except:
             return str(numstr)
 
-
-
     def __parse_graph_types(self, graph_types):
 
-        tmp = \
-            [typ.strip() for typ in graph_types[1:].strip().lower().split(self.CSVSplitChar)]
-
+        tmp = [typ.strip() for typ in graph_types[1:].strip().lower().split(self.delimiter)]
 
         for i,typ in enumerate(tmp):
             if len(tmp) > 1 and i == 0 and typ != self.PLACE_HOLDER:
+                LOGGER.warn("when specifying more than one graph type, first type must be place holder")
                 return
             if typ == self.PLACE_HOLDER: continue
-            if not typ in self.GraphTypeIdentifier:
+            if not typ in self.GRAPH_TYPES_CONVERTER:
+                LOGGER.warn("unrecognized graph type \"%s\"" %str(typ))
                 return
 
-        if len(tmp) == 1:
-            return tmp
-        else:
-            return tmp[1:]
-
+        return (tmp if len(tmp) == 1 else tmp[1:])
 
     def __parse_column_title(self, column_name):
 
+        column_title_row = []
 
-        column_title_row = \
-            [x.strip() for x in column_name[1:].split(self.CSVSplitChar)]
+        for each in column_name[1:].split(self.delimiter):
+            clean = each.strip()
 
-        if len(self.graph_types) > 1 and len(column_title_row) != len(self.graph_types) + 1:
+            if clean == self.Y2_INDICATES:
+                LOGGER.warn("invalid column title \"%s\"" %str(clean))
+                return
+
+            column_title_row.append((clean.startswith(self.Y2_INDICATES),clean))
+
+        if len(self.datum.graph_types) > 1 and len(column_title_row) != len(self.datum.graph_types) + 1:
+            LOGGER.warn("unmatch length for graph types and column titles")
             return
 
         if len(column_title_row) < 2:
+            LOGGER.warn("too short column title, must greater than 2")
             return
 
         return column_title_row[1:]
 
     def __parse_xaxis_title(self, xaxis_title):
 
-        subcommand_sep = ":"
-
-        if subcommand_sep in xaxis_title:
+        if self.SUBCOMMAND_SEP in xaxis_title:
             flag = False
             title = ""
-            first_half, last_half = [each.strip() for each in xaxis_title.split(subcommand_sep)]
+            first_half, last_half = [each.strip() for each in xaxis_title.split(self.SUBCOMMAND_SEP)]
             if last_half == self.RANGESLIDER:
                 flag = True
                 title = first_half
@@ -184,18 +196,12 @@ class Graph(object):
         else:
             return False, xaxis_title
 
+    def setup_load(self):
+        pass
 
+    def load(self):
 
-    def load_dataset_file(self, file_path):
-
-        """
-        CSVファイルを読み込み、データをセットする
-
-        想定するCSVファイルは初めの5行にコメントがある
-        コメントはグラフのメタ情報を表す
-        """
-
-        with open(file_path, "r") as handle:
+        with open(self.filepath, "r") as handle:
 
             title       = handle.readline().strip()
             xaxis_title = handle.readline().strip()
@@ -210,26 +216,27 @@ class Graph(object):
                 graph_types,
                 column_name]): return
 
-            self.graph_title = title[1:].strip()
-            self.xaxis_slider, self.xaxis_title = self.__parse_xaxis_title(xaxis_title[1:].strip())
-            self.yaxis_title = [x.strip() for x in yaxis_title[1:].strip().split(self.CSVSplitChar)]
-            self.graph_types = self.__parse_graph_types(graph_types)
+            self.datum.graph_title = title[1:].strip()
+            self.datum.xaxis_slider, self.datum.xaxis_title = self.__parse_xaxis_title(xaxis_title[1:].strip())
+            self.datum.yaxis_title = [x.strip() for x in yaxis_title[1:].strip().split(self.delimiter)]
+            self.datum.column_title = self.__parse_column_title(column_name)
+            graph_types_pre_obj  = self.__parse_graph_types(graph_types)
 
-            if not self.graph_types:
+            if not graph_types_pre_obj:
                 return
 
-            self.column_title = self.__parse_column_title(column_name)
-
-            if not self.column_title:
+            if not self.datum.column_title:
                 return
 
-            if len(self.graph_types) < len(self.column_title):
-                specific_type = self.graph_types[0]
-                larger  = len(self.column_title)
-                smaller = len(self.graph_types)
-                self.graph_types.extend([specific_type] * (larger - smaller))
-            elif len(self.graph_types) > len(self.column_title):
+            if len(graph_types_pre_obj) < len(self.datum.column_title):
+                specific_type = graph_types_pre_obj[0]
+                larger  = len(self.datum.column_title)
+                smaller = len(graph_types_pre_obj)
+                graph_types_pre_obj.extend([specific_type] * (larger - smaller))
+            elif len(graph_types_pre_obj) > len(self.datum.column_title):
                 return
+
+            self.datum.graph_types = [self.GRAPH_TYPES_CONVERTER[each] for each in graph_types_pre_obj]
 
             tmp_data = []
             x = []
@@ -237,10 +244,11 @@ class Graph(object):
             for line in handle:
                 st = line.strip()
                 if st == "":
+                    LOGGER.info("skip loading for empty line")
                     continue
-                row = st.split(self.CSVSplitChar)
+                row = st.split(self.delimiter)
 
-                if len(row) != len(self.column_title) + 1:
+                if len(row) != len(self.datum.column_title) + 1:
                     return
 
                 numrow = list(map(self.__numstr_to_num, row))
@@ -249,51 +257,61 @@ class Graph(object):
 
             trans = list(map(list, zip(*tmp_data)))[1:]
 
-            self.x_data = x
-            self.column_datum = trans
+            self.datum.x_data = x
+            self.datum.column_datum = trans
+
+        return self.datum
 
 
+class GraphMaker(object):
+
+    TraceMaker = {GraphTypes.Lines   : (lambda title,x,y,axis: 
+                                        go.Scatter(x=x, y=y, mode="lines", name=title, yaxis=axis)),\
+                  GraphTypes.Bar     : (lambda title,x,y,axis: 
+                                        go.Bar(x=x, y=y, name=title, yaxis=axis)),\
+                  GraphTypes.Scatter : (lambda title,x,y,axis: 
+                                        go.Scatter(x=x, y=y, mode="markers", name=title, yaxis=axis))}
+
+    def __init__(self, datum, font_size, bgcolor):
+
+        self.datum = datum
+        self.font_size = font_size
+        self.bgcolor = bgcolor
 
     def make_graph(self):
 
-        """
-        self.graph_type の値に応じて
-        実際にグラフを作成するメソッドを呼び出す
-        """
-
-        if not self.graph_types:
+        if not self.datum.graph_types:
             return
 
         traces = []
 
-        for graph_type, column_title, column_data in zip(self.graph_types, self.column_title, self.column_datum):
-
-            if column_title == self.Y2_INDICATES:
-                return
-
-            if column_title.startswith(self.Y2_INDICATES):
-                if len(self.yaxis_title) == 1:
+        for graph_type, (y2flag, column_title), column_data in zip(self.datum.graph_types, 
+                                                                   self.datum.column_title, 
+                                                                   self.datum.column_datum):
+            if y2flag:
+                if len(self.datum.yaxis_title) == 1:
+                    LOGGER.warn("y2 title must be specified")
                     return
                 axis = "y2"
                 column_title = column_title[1:]
             else:
                 axis = "y1"
 
-            trace_maker = self.GraphTypeIdentifier[graph_type]
-            trace = trace_maker(column_title, self.x_data, column_data, axis)
+            trace_maker = self.TraceMaker[graph_type]
+            trace = trace_maker(column_title, self.datum.x_data, column_data, axis)
             traces.append(trace)
 
-        if len(self.yaxis_title) == 1:
+        if len(self.datum.yaxis_title) == 1:
             yaxis2 = dict()
         else:
-            yaxis2 = dict(title = self.yaxis_title[1], side = "right", overlaying = "y")
+            yaxis2 = dict(title = self.datum.yaxis_title[1], side = "right", overlaying = "y")
 
         figure = dict(
             data = traces,
-            layout = go.Layout(title=self.graph_title,
-                                xaxis=({"title": self.xaxis_title} if not self.xaxis_slider else
-                                       {"title": self.xaxis_title,self.RANGESLIDER:{}}),
-                                yaxis=dict(title = self.yaxis_title[0]),
+            layout = go.Layout(title=self.datum.graph_title,
+                                xaxis=({"title": self.datum.xaxis_title} if not self.datum.xaxis_slider else
+                                       {"title": self.datum.xaxis_title, "rangeslider":{}}),
+                                yaxis=dict(title = self.datum.yaxis_title[0]),
                                 yaxis2=yaxis2,
                                 paper_bgcolor=self.bgcolor,
                                 plot_bgcolor=self.bgcolor,
@@ -303,24 +321,19 @@ class Graph(object):
                                             yanchor="top",
                                             x=0,
                                             y=1.1)))
-
         return figure
-
 
 
 def make_dropdown_menu(path):
 
-    """
-    path 配下に存在する csv ファイル名からdropdown のメニューを作成する
-    """
-
     files = os.listdir(path)
-    if not files:
+    con = [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
+
+    if not con:
         LOGGER.critical("directory %s does not contain any files" %path)
         sys.exit(1)
 
-    return [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
-
+    return con
 
 
 if __name__ == "__main__":
@@ -335,7 +348,6 @@ if __name__ == "__main__":
     menu = make_dropdown_menu(args.directory)
 
     application = dash.Dash()
-
     application.title = args.apptitle
     application.css.config.serve_locally = args.offline
     application.scripts.config.serve_locally = args.offline
@@ -377,28 +389,45 @@ if __name__ == "__main__":
         [Input("graph_selection", "value")])
     def update_graph(value):
 
-        """
-        指定ディレクトリ配下のCSVファイルを読み込み、グラフを描画する
-        """
-
         graphs = []
 
         for each in reversed(value):
 
+            LOGGER.info("loading for \"%s\"" %each)
+
             if (not each) or (".." in each) or ("/" in each):
-                return
+                LOGGER.warn("invalid character \"%s\"" %each)
+                continue
 
-            graph = Graph(args.delimiter, args.fontsize, "#" + args.bgcolor)
-            graph.load_dataset_file(os.path.join(args.directory, each))
+            try:
+                loader = CSVFileLoader(os.path.join(args.directory, each), args.delimiter)
+                loader.setup_load()
+                datum  = loader.load()
+            except Exception as ex:
+                LOGGER.error("exception occurred while loading data for \"%s\"" %each)
+                LOGGER.error("%s" %str(ex))
+                continue
 
-            graph_obj = doc.Graph(id=hashlib.md5(each.encode("utf-8")).hexdigest(),
-                                  figure=graph.make_graph(),
-                                  style=dict(height = args.height, 
-                                             width=args.width, 
-                                             marginTop= "18px",
-                                             marginLeft="auto",
-                                             marginRight="auto"),
-                                  config=dict(displayModeBar=args.showtoolbar))
+            if not datum:
+                LOGGER.warn("unable to load data for \"%s\"" %each)
+                continue
+
+            try:
+                graph = GraphMaker(datum, args.fontsize, "#" + args.bgcolor)
+                graph_obj = doc.Graph(id=hashlib.md5(each.encode("utf-8")).hexdigest(),
+                                      figure=graph.make_graph(),
+                                      style=dict(height = args.height, 
+                                                 width=args.width, 
+                                                 marginTop= "18px",
+                                                 marginLeft="auto",
+                                                 marginRight="auto"),
+                                      config=dict(displayModeBar=args.showtoolbar))
+            except Exception as ex:
+                LOGGER.error("exception occurred while rendering graph for \"each\"" %each)
+                LOGGER.error("%s" %str(ex))
+                continue
+
+            LOGGER.info("graph object collected in properly")
 
             graphs.append(graph_obj)
 
@@ -408,10 +437,6 @@ if __name__ == "__main__":
         Output("graph_selection", "options"),
         [Input("update-menu", "n_clicks")])
     def update_menu(_):
-
-        """
-        指定ディレクトリ配下のファイルから、ドロップダウンメニューを再作成する
-        """
 
         return make_dropdown_menu(args.directory)
 
