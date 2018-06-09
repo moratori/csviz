@@ -42,6 +42,8 @@ def setup_command_line_argument_parser():
 
 def setup_logging(log_file_path):
 
+    global LOGGER
+
     logger = logging.getLogger()
     logger.setLevel(logging.INFO)
 
@@ -59,7 +61,9 @@ def setup_logging(log_file_path):
     handler.setFormatter(formatter)
     logger.addHandler(handler)
 
-    return
+    LOGGER = logger
+
+    return 
 
 
 
@@ -314,7 +318,7 @@ def make_dropdown_menu(path):
 
     files = os.listdir(path)
     if not files:
-        print("directory does not contain any files")
+        LOGGER.critical("directory %s does not contain any files" %path)
         sys.exit(1)
 
     return [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
@@ -324,11 +328,10 @@ def make_dropdown_menu(path):
 if __name__ == "__main__":
 
     args = setup_command_line_argument_parser()
-
     setup_logging(args.log)
 
     if not os.path.isdir(args.directory):
-        print("directory does not exist")
+        LOGGER.critical("directory %s does not exist" %args.directory)
         sys.exit(1)
 
     menu = make_dropdown_menu(args.directory)
