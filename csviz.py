@@ -7,11 +7,60 @@ import socket
 import argparse
 import datetime
 import hashlib
+import logging
+import logging.handlers
+
 import dash
 import dash_html_components as html
 import dash_core_components as doc
 import plotly.graph_objs as go
 from dash.dependencies import Input, Output
+
+
+
+def setup_command_line_argument_parser():
+
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
+    argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
+    argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
+    argparser.add_argument("--width", type=int, default=1080, help="width for graph")
+    argparser.add_argument("--height", type=int, default=590, help="height for graph")
+    argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
+    argparser.add_argument("--fontsize", type=int, default=14, help="font size")
+    argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
+    argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
+    argparser.add_argument("--debug", action="store_true", help="setting for debug mode")
+    argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
+    argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
+    argparser.add_argument("--log", type=str, default=None, help="log file name")
+
+    args = argparser.parse_args()
+
+    return args
+
+
+def setup_logging(log_file_path):
+
+    logger = logging.getLogger()
+    logger.setLevel(logging.INFO)
+
+    formatter = logging.Formatter(fmt="%(asctime)s %(levelname)s :: %(message)s")
+
+    if not log_file_path:
+        handler = logging.StreamHandler()
+    
+    else:
+        handler = logging.handlers.TimedRotatingFileHandler(
+            filename=log_file_path,
+            when="D",
+            backupCount=90)
+
+    handler.setFormatter(formatter)
+    logger.addHandler(handler)
+
+    return
+
 
 
 class Graph(object):
@@ -271,30 +320,12 @@ def make_dropdown_menu(path):
     return [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
 
 
-def setup_command_line_argument_parser():
-
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
-    argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
-    argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
-    argparser.add_argument("--width", type=int, default=1080, help="width for graph")
-    argparser.add_argument("--height", type=int, default=590, help="height for graph")
-    argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
-    argparser.add_argument("--fontsize", type=int, default=14, help="font size")
-    argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
-    argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
-    argparser.add_argument("--debug", action="store_true", help="setting for debug mode")
-    argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
-    argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
-
-    args = argparser.parse_args()
-
-    return args
-
-
 
 if __name__ == "__main__":
+
     args = setup_command_line_argument_parser()
+
+    setup_logging(args.log)
 
     if not os.path.isdir(args.directory):
         print("directory does not exist")
