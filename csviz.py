@@ -3,9 +3,7 @@
 
 import sys
 import os
-import socket
 import argparse
-import datetime
 import hashlib
 import logging
 import logging.handlers
