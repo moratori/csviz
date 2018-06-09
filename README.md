@@ -50,6 +50,7 @@ $ conda env create --file requirements.txt
 - --debug : debug mode
 - --showtoolbar : show flooting tool bar
 - --offline: disable loading resources from CDN
+- --log None : log file name
 
 ## Demo
 
