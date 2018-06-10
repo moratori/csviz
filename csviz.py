@@ -9,6 +9,7 @@ import logging
 import logging.handlers
 from abc import ABCMeta, abstractmethod
 from enum import Enum, auto
+from flask import abort, Response
 
 import dash
 import dash_html_components as html
@@ -34,6 +35,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
     argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
     argparser.add_argument("--log", type=str, default=None, help="log file name")
+    argparser.add_argument("--cssdir", type=str, default=None, help="css directory")
 
     args = argparser.parse_args()
 
@@ -325,6 +327,10 @@ class GraphMaker(object):
 
 
 def make_dropdown_menu(path):
+    
+    if not os.path.isdir(path):
+        LOGGER.critical("csv data directory %s does not exist" %path)
+        sys.exit(1)
 
     files = os.listdir(path)
     con = [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
@@ -336,23 +342,47 @@ def make_dropdown_menu(path):
     return con
 
 
+def add_external_css_to_app(application, cssdir):
+
+    if not cssdir:
+        LOGGER.info("no external css directory specified")
+        return
+
+    if not os.path.isdir(cssdir):
+        LOGGER.critical("csv data directory %s does not exist" %cssdir)
+        sys.exit(1)
+
+    tmp = os.listdir(cssdir)
+    cssfiles = []
+
+    for each in tmp:
+        if not each.endswith(".css"):
+            continue
+        cssfiles.append(each)
+        application.css.append_css(dict(external_url="/css/%s" %each))
+
+    return cssfiles
+
+
+
 if __name__ == "__main__":
 
     args = setup_command_line_argument_parser()
+
     setup_logging(args.log)
 
-    if not os.path.isdir(args.directory):
-        LOGGER.critical("directory %s does not exist" %args.directory)
-        sys.exit(1)
-
-    menu = make_dropdown_menu(args.directory)
 
     application = dash.Dash()
     application.title = args.apptitle
     application.css.config.serve_locally = args.offline
     application.scripts.config.serve_locally = args.offline
 
+    menu = make_dropdown_menu(args.directory)
+    cssfiles = add_external_css_to_app(application, args.cssdir)
+
     application.layout = html.Div([
+
+        html.Div([],id="header"),
 
         html.Div([
             html.H1(args.apptitle, style=dict(textAlign="left")),
@@ -364,24 +394,29 @@ if __name__ == "__main__":
 
         html.Div([
 
-        html.Div([
-        doc.Dropdown(
-            id="graph_selection",
-            options=menu,
-            value=[menu[0]["value"]],
-            multi=True),
-        html.Button("reload list", id="update-menu")
-        ],style=dict(width=args.width, 
-                     marginLeft="auto",
-                     marginRight="auto",
-                     marginTop="2%")),
+            html.Div([
+            doc.Dropdown(
+                id="graph_selection",
+                options=menu,
+                value=[menu[0]["value"]],
+                multi=True),
+            html.Button("reload list", id="update-menu")
+            ],style=dict(width=args.width, 
+                         marginLeft="auto",
+                         marginRight="auto",
+                         marginTop="2%")),
 
-        html.Div(id="graphs")
+            html.Div(id="graphs")
+
         ],style=dict(width=args.width+50, 
                      margin="auto",
                      paddingBottom="1%",
                      border="1px solid #eee",
-                     boxShadow = "0px 0px 3px"))])
+                     boxShadow = "0px 0px 3px")),
+
+        html.Div([],id="footer"),
+
+        ])
 
 
     @application.callback(
@@ -440,5 +475,30 @@ if __name__ == "__main__":
 
         return make_dropdown_menu(args.directory)
 
+
+
+    @application.server.route("/css/<stylesheet>")
+    def serve_stylesheet(stylesheet):
+
+        LOGGER.info("requested css file name \"%s\"" %str(stylesheet))
+
+        if not stylesheet in cssfiles:
+            LOGGER.warn("file \"%s\" not in %s" %(str(stylesheet), str(cssfiles)))
+            abort(404)
+
+        if (".." in stylesheet) or ("/" in stylesheet):
+            LOGGER.warn("invalid file name \"%s\"" %str(stylesheet))
+            abort(404)
+
+        try:
+            with open(os.path.join(args.cssdir, stylesheet), "r") as handle:
+                return Response(handle.read(), mimetype="text/css")
+
+        except Exception as ex:
+            LOGGER.warn("exception occurred while loading css file \"%s\"" %str(stylesheet))
+            abort(404)
+
+
     application.run_server(debug=args.debug, host=args.addr, port=args.port)
+
 

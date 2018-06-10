@@ -51,6 +51,7 @@ $ conda env create --file requirements.txt
 - --showtoolbar : show flooting tool bar
 - --offline: disable loading resources from CDN
 - --log None : log file name
+- --cssdir None: directory contains css files
 
 ## Demo
 
