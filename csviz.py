@@ -342,7 +342,7 @@ def make_dropdown_menu(path):
     return con
 
 
-def add_external_css_to_app(application, cssdir):
+def add_local_css_to_app(cssdir):
 
     if not cssdir:
         LOGGER.info("no external css directory specified")
@@ -353,15 +353,9 @@ def add_external_css_to_app(application, cssdir):
         sys.exit(1)
 
     tmp = os.listdir(cssdir)
-    cssfiles = []
 
-    for each in tmp:
-        if not each.endswith(".css"):
-            continue
-        cssfiles.append(each)
-        application.css.append_css(dict(external_url="/css/%s" %each))
-
-    return cssfiles
+    return [html.Link(rel="stylesheet", href="/css/%s" %each) 
+            for each in tmp if each.endswith(".css")]
 
 
 
@@ -378,9 +372,10 @@ if __name__ == "__main__":
     application.scripts.config.serve_locally = args.offline
 
     menu = make_dropdown_menu(args.directory)
-    cssfiles = add_external_css_to_app(application, args.cssdir)
 
     application.layout = html.Div([
+
+        html.Div(add_local_css_to_app(args.cssdir)),
 
         html.Div([],id="header"),
 
@@ -481,10 +476,6 @@ if __name__ == "__main__":
     def serve_stylesheet(stylesheet):
 
         LOGGER.info("requested css file name \"%s\"" %str(stylesheet))
-
-        if not stylesheet in cssfiles:
-            LOGGER.warn("file \"%s\" not in %s" %(str(stylesheet), str(cssfiles)))
-            abort(404)
 
         if (".." in stylesheet) or ("/" in stylesheet):
             LOGGER.warn("invalid file name \"%s\"" %str(stylesheet))
