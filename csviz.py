@@ -332,7 +332,7 @@ def make_dropdown_menu(path):
         LOGGER.critical("csv data directory %s does not exist" %path)
         sys.exit(1)
 
-    files = os.listdir(path)
+    files = sorted(os.listdir(path))
     con = [dict(label = fname, value = fname) for fname in files if not fname.startswith(".")]
 
     if not con:
