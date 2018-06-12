@@ -25,7 +25,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("directory", type=str, help="directory that contains csv file to show")
     argparser.add_argument("--addr", type=str, default="0.0.0.0", help="ip address to bind")
     argparser.add_argument("--port", type=int, default=8050, help="port number to bind")
-    argparser.add_argument("--width", type=int, default=1080, help="width for graph")
+    argparser.add_argument("--width", type=int, default=1300, help="width for graph")
     argparser.add_argument("--height", type=int, default=590, help="height for graph")
     argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
     argparser.add_argument("--fontsize", type=int, default=14, help="font size")
@@ -51,7 +51,7 @@ def setup_logging(log_file_path):
 
     formatter = logging.Formatter(fmt="%(asctime)s %(levelname)s :: %(message)s")
 
-    if not log_file_path:
+    if log_file_path is None:
         handler = logging.StreamHandler()
     
     else:
@@ -224,10 +224,10 @@ class CSVFileLoader(DataLoader):
             self.datum.column_title = self.__parse_column_title(column_name)
             graph_types_pre_obj  = self.__parse_graph_types(graph_types)
 
-            if not graph_types_pre_obj:
+            if graph_types_pre_obj is None:
                 return
 
-            if not self.datum.column_title:
+            if self.datum.column_title is None:
                 return
 
             if len(graph_types_pre_obj) < len(self.datum.column_title):
@@ -342,9 +342,50 @@ def make_dropdown_menu(path):
     return con
 
 
+def make_graph_wrapper(args, fname, listup=0):
+
+    if listup > 0:
+        graph_width  = args.width/listup
+        graph_height = args.height
+    else:
+        graph_width = args.width
+        graph_height = args.height
+
+    try:
+        loader = CSVFileLoader(os.path.join(args.directory, fname), args.delimiter)
+        loader.setup_load()
+        datum  = loader.load()
+    except Exception as ex:
+        LOGGER.error("exception occurred while loading data for \"%s\"" %fname)
+        LOGGER.error("%s" %str(ex))
+        return 
+
+    if datum is None:
+        LOGGER.warn("unable to load data for \"%s\"" %fname)
+        return
+
+    try:
+        graph = GraphMaker(datum, args.fontsize, "#" + args.bgcolor)
+        graph_obj = doc.Graph(id=hashlib.md5(fname.encode("utf-8")).hexdigest(),
+                              figure=graph.make_graph(),
+                              style=dict(height = graph_height, 
+                                         width=graph_width, 
+                                         marginTop= "18px",
+                                         marginLeft="auto",
+                                         marginRight="auto"),
+                              config=dict(displayModeBar=args.showtoolbar))
+        return graph_obj
+
+    except Exception as ex:
+        LOGGER.error("exception occurred while rendering graph for \"%s\"" %fname)
+        LOGGER.error("%s" %str(ex))
+        return
+
+
+
 def add_local_css_to_app(cssdir):
 
-    if not cssdir:
+    if cssdir is None:
         LOGGER.info("no external css directory specified")
         return
 
@@ -358,26 +399,28 @@ def add_local_css_to_app(cssdir):
             for each in tmp if each.endswith(".css")]
 
 
+def make_header_links(pager):
+    result = []
+    for key in pager:
+        (title, ref)= pager[key]
+        result.append(html.Li(doc.Link(title, href=key)))
+    return html.Ul(result)
 
-if __name__ == "__main__":
 
-    args = setup_command_line_argument_parser()
-
-    setup_logging(args.log)
-
-
-    application = dash.Dash()
-    application.title = args.apptitle
-    application.css.config.serve_locally = args.offline
-    application.scripts.config.serve_locally = args.offline
+def make_top_page(args, pager):
 
     menu = make_dropdown_menu(args.directory)
 
-    application.layout = html.Div([
+    return \
+        html.Div([
 
         html.Div(add_local_css_to_app(args.cssdir)),
 
-        html.Div([],id="header"),
+        html.Div([
+            html.Div([
+                make_header_links(pager)
+            ],id="menu")
+        ],id="header"),
 
         html.Div([
             html.H1(args.apptitle, style=dict(textAlign="left")),
@@ -409,10 +452,93 @@ if __name__ == "__main__":
                      border="1px solid #eee",
                      boxShadow = "0px 0px 3px")),
 
-        html.Div([],id="footer"),
+        html.Div([],id="footer")])
 
-        ])
 
+def listup_graphs(args):
+
+    files = make_dropdown_menu(args.directory)
+    width_tiling = 2
+
+    result = []
+    width_graph_group = []
+
+    for each in files:
+
+        fname = each["value"]
+        graph = make_graph_wrapper(args, fname, listup=width_tiling)
+
+        graph_section = html.Div(graph, style=dict(width='%spx' %int(args.width/width_tiling),
+                                                   display='inline-block',
+                                                   marginRight="10px",
+                                                   marginLeft="10px"))
+        width_graph_group.append(graph_section)
+
+        if len(width_graph_group) == width_tiling:
+            result.append(html.Div(width_graph_group, style=dict(marginLeft="auto",marginRight="auto")))
+            width_graph_group = []
+
+    if width_graph_group:
+        result.append(html.Div(width_graph_group, style=dict(marginLeft="auto",marginRight="auto")))
+
+    return html.Div(result)
+
+
+
+def make_graph_listup_page(args, pager):
+    
+    return \
+        html.Div([
+            
+            html.Div(add_local_css_to_app(args.cssdir)),
+            
+            html.Div([
+                html.Div([
+                    make_header_links(pager)
+                ],id="menu")
+            ],id="header"),
+            
+            html.Div([
+                html.H1("グラフ一覧", style=dict(textAlign="left")),
+            ],style=dict(width=args.width+50,
+                         fontFamily="Helvetica , 游ゴシック, sans-serif",
+                         fontSize="18",
+                         marginLeft="auto",
+                         marginRight="auto")),
+            
+            html.Div([
+                
+                listup_graphs(args)
+            
+            ],style=dict(width=args.width+50, 
+                         textAlign="center",
+                         margin="auto",
+                         paddingBottom="1%",
+                         border="1px solid #eee",
+                         boxShadow = "0px 0px 3px")),
+
+            html.Div([],id="footer")])
+
+
+if __name__ == "__main__":
+
+    pager = {"/"     : ("トップ", make_top_page),
+             "/list" : ("一覧", make_graph_listup_page)}
+
+    args = setup_command_line_argument_parser()
+
+    setup_logging(args.log)
+
+    application = dash.Dash()
+    application.title = args.apptitle
+    application.css.config.serve_locally = args.offline
+    application.scripts.config.serve_locally = args.offline
+
+    application.layout = html.Div([
+        doc.Location(id="url", refresh=False),
+        html.Div([
+            make_top_page(args,pager)
+        ],id="page-content")])
 
     @application.callback(
         Output("graphs", "children"),
@@ -429,39 +555,29 @@ if __name__ == "__main__":
                 LOGGER.warn("invalid character \"%s\"" %each)
                 continue
 
-            try:
-                loader = CSVFileLoader(os.path.join(args.directory, each), args.delimiter)
-                loader.setup_load()
-                datum  = loader.load()
-            except Exception as ex:
-                LOGGER.error("exception occurred while loading data for \"%s\"" %each)
-                LOGGER.error("%s" %str(ex))
-                continue
+            graph_obj = make_graph_wrapper(args, each)
 
-            if not datum:
-                LOGGER.warn("unable to load data for \"%s\"" %each)
+            if graph_obj is None:
                 continue
-
-            try:
-                graph = GraphMaker(datum, args.fontsize, "#" + args.bgcolor)
-                graph_obj = doc.Graph(id=hashlib.md5(each.encode("utf-8")).hexdigest(),
-                                      figure=graph.make_graph(),
-                                      style=dict(height = args.height, 
-                                                 width=args.width, 
-                                                 marginTop= "18px",
-                                                 marginLeft="auto",
-                                                 marginRight="auto"),
-                                      config=dict(displayModeBar=args.showtoolbar))
-            except Exception as ex:
-                LOGGER.error("exception occurred while rendering graph for \"each\"" %each)
-                LOGGER.error("%s" %str(ex))
-                continue
-
+            
+            graphs.append(graph_obj)
             LOGGER.info("graph object collected in properly")
 
-            graphs.append(graph_obj)
-
         return graphs
+
+    @application.callback(
+        Output("page-content", "children"),
+        [Input("url","pathname")])
+    def make_page(pathname):
+        LOGGER.info("requested page \"%s\"" %pathname)
+
+        if not pathname in pager:
+            LOGGER.warn("requested page \"%s\" does not exists" %str(pathname))
+            return
+
+        title, maker = pager[pathname]
+
+        return maker(args, pager)
 
     @application.callback(
         Output("graph_selection", "options"),
@@ -469,8 +585,6 @@ if __name__ == "__main__":
     def update_menu(_):
 
         return make_dropdown_menu(args.directory)
-
-
 
     @application.server.route("/css/<stylesheet>")
     def serve_stylesheet(stylesheet):
@@ -489,7 +603,5 @@ if __name__ == "__main__":
             LOGGER.warn("exception occurred while loading css file \"%s\"" %str(stylesheet))
             abort(404)
 
-
     application.run_server(debug=args.debug, host=args.addr, port=args.port)
-
 
