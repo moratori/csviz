@@ -30,16 +30,14 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--delimiter", type=str, default=",", help="csv delimitor")
     argparser.add_argument("--fontsize", type=int, default=14, help="font size")
     argparser.add_argument("--bgcolor", type=str, default="ffe", help="font size")
-    argparser.add_argument("--apptitle", type=str,default="Statistical Information for Something System", help="application title")
+    argparser.add_argument("--apptitle", type=str, default="Statistical Information for Something System", help="application title")
     argparser.add_argument("--debug", action="store_true", help="setting for debug mode")
     argparser.add_argument("--showtoolbar", action="store_true", help="show flooting toolbar")
     argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
     argparser.add_argument("--log", type=str, default=None, help="log file name")
     argparser.add_argument("--cssdir", type=str, default=None, help="css directory")
 
-    args = argparser.parse_args()
-
-    return args
+    return argparser.parse_args()
 
 
 def setup_logging(log_file_path):
@@ -110,17 +108,17 @@ class CSVFileLoader(DataLoader):
     HEADER_COMMENT = "#"
     RANGESLIDER = "rangeslider"
     SUBCOMMAND_SEP = ":"
-    GRAPH_TYPES_CONVERTER = {"lines"  : GraphTypes.Lines, 
-                             "bar"    : GraphTypes.Bar, 
+    GRAPH_TYPES_CONVERTER = {"lines"  : GraphTypes.Lines,
+                             "bar"    : GraphTypes.Bar,
                              "scatter": GraphTypes.Scatter}
 
     def __init__(self, filepath, delimiter):
-        self.filepath  = filepath
+        self.filepath = filepath
         self.delimiter = delimiter
         self.datum = GraphDatum()
 
     def __csv_header_check(self, headers):
-    
+
         for line in headers:
             if not line:
                 LOGGER.warn("empty line found while header")
@@ -149,11 +147,12 @@ class CSVFileLoader(DataLoader):
 
         tmp = [typ.strip() for typ in graph_types[1:].strip().lower().split(self.delimiter)]
 
-        for i,typ in enumerate(tmp):
+        for i, typ in enumerate(tmp):
             if len(tmp) > 1 and i == 0 and typ != self.PLACE_HOLDER:
                 LOGGER.warn("when specifying more than one graph type, first type must be place holder")
                 return
-            if typ == self.PLACE_HOLDER: continue
+            if typ == self.PLACE_HOLDER:
+                continue
             if not typ in self.GRAPH_TYPES_CONVERTER:
                 LOGGER.warn("unrecognized graph type \"%s\"" %str(typ))
                 return
@@ -171,7 +170,7 @@ class CSVFileLoader(DataLoader):
                 LOGGER.warn("invalid column title \"%s\"" %str(clean))
                 return
 
-            column_title_row.append((clean.startswith(self.Y2_INDICATES),clean))
+            column_title_row.append((clean.startswith(self.Y2_INDICATES), clean))
 
         if len(self.datum.graph_types) > 1 and len(column_title_row) != len(self.datum.graph_types) + 1:
             LOGGER.warn("unmatch length for graph types and column titles")
@@ -222,7 +221,7 @@ class CSVFileLoader(DataLoader):
             self.datum.xaxis_slider, self.datum.xaxis_title = self.__parse_xaxis_title(xaxis_title[1:].strip())
             self.datum.yaxis_title = [x.strip() for x in yaxis_title[1:].strip().split(self.delimiter)]
             self.datum.column_title = self.__parse_column_title(column_name)
-            graph_types_pre_obj  = self.__parse_graph_types(graph_types)
+            graph_types_pre_obj = self.__parse_graph_types(graph_types)
 
             if graph_types_pre_obj is None:
                 return
@@ -232,7 +231,7 @@ class CSVFileLoader(DataLoader):
 
             if len(graph_types_pre_obj) < len(self.datum.column_title):
                 specific_type = graph_types_pre_obj[0]
-                larger  = len(self.datum.column_title)
+                larger = len(self.datum.column_title)
                 smaller = len(graph_types_pre_obj)
                 graph_types_pre_obj.extend([specific_type] * (larger - smaller))
             elif len(graph_types_pre_obj) > len(self.datum.column_title):
@@ -267,11 +266,11 @@ class CSVFileLoader(DataLoader):
 
 class GraphMaker(object):
 
-    TraceMaker = {GraphTypes.Lines   : (lambda title,x,y,axis: 
+    TraceMaker = {GraphTypes.Lines   : (lambda title, x, y, axis:
                                         go.Scatter(x=x, y=y, mode="lines", name=title, yaxis=axis)),\
-                  GraphTypes.Bar     : (lambda title,x,y,axis: 
+                  GraphTypes.Bar     : (lambda title, x, y, axis:
                                         go.Bar(x=x, y=y, name=title, yaxis=axis)),\
-                  GraphTypes.Scatter : (lambda title,x,y,axis: 
+                  GraphTypes.Scatter : (lambda title, x, y, axis:
                                         go.Scatter(x=x, y=y, mode="markers", name=title, yaxis=axis))}
 
     def __init__(self, datum, font_size, bgcolor):
@@ -287,8 +286,8 @@ class GraphMaker(object):
 
         traces = []
 
-        for graph_type, (y2flag, column_title), column_data in zip(self.datum.graph_types, 
-                                                                   self.datum.column_title, 
+        for graph_type, (y2flag, column_title), column_data in zip(self.datum.graph_types,
+                                                                   self.datum.column_title,
                                                                    self.datum.column_datum):
             if y2flag:
                 if len(self.datum.yaxis_title) == 1:
@@ -395,7 +394,7 @@ def add_local_css_to_app(cssdir):
 
     tmp = os.listdir(cssdir)
 
-    return [html.Link(rel="stylesheet", href="/css/%s" %each) 
+    return [html.Link(rel="stylesheet", href="/css/%s" %each)
             for each in tmp if each.endswith(".css")]
 
 
@@ -510,7 +509,7 @@ def make_graph_listup_page(args, pager):
                 
                 listup_graphs(args)
             
-            ],style=dict(width=args.width+50, 
+            ],style=dict(width=args.width+50,
                          textAlign="center",
                          margin="auto",
                          paddingBottom="1%",
