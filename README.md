@@ -52,6 +52,7 @@ $ conda env create --file requirements.yml
 - --offline: disable loading resources from CDN
 - --log None : log file name
 - --cssdir None: directory contains css files
+- --limit None: limit for loading data
 
 ## Demo
 
