@@ -535,7 +535,7 @@ if __name__ == "__main__":
     application.scripts.config.serve_locally = args.offline
 
     application.layout = html.Div([
-        doc.Location(id="url", refresh=False),
+        doc.Location(id="url", refresh=False, pathname="/"),
         html.Div([
             make_top_page(args,pager)
         ],id="page-content")])
@@ -567,7 +567,7 @@ if __name__ == "__main__":
 
     @application.callback(
         Output("page-content", "children"),
-        [Input("url","pathname")])
+        [Input("url", "pathname")])
     def make_page(pathname):
         LOGGER.info("requested page \"%s\"" %pathname)
 
