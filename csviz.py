@@ -36,6 +36,7 @@ def setup_command_line_argument_parser():
     argparser.add_argument("--offline", action="store_true", help="disable loading resources from cdn")
     argparser.add_argument("--log", type=str, default=None, help="log file name")
     argparser.add_argument("--cssdir", type=str, default=None, help="css directory")
+    argparser.add_argument("--limit", type=int, default=None, help="limit for loading rows")
 
     return argparser.parse_args()
 
@@ -112,10 +113,11 @@ class CSVFileLoader(DataLoader):
                              "bar"    : GraphTypes.Bar,
                              "scatter": GraphTypes.Scatter}
 
-    def __init__(self, filepath, delimiter):
+    def __init__(self, filepath, delimiter, limit):
         self.filepath = filepath
         self.delimiter = delimiter
         self.datum = GraphDatum()
+        self.limit = limit
 
     def __csv_header_check(self, headers):
 
@@ -202,6 +204,8 @@ class CSVFileLoader(DataLoader):
 
     def load(self):
 
+        num_lines = sum(1 for line in open(self.filepath, "r")) - 1 - 5
+
         with open(self.filepath, "r") as handle:
 
             title       = handle.readline().strip()
@@ -242,7 +246,12 @@ class CSVFileLoader(DataLoader):
             tmp_data = []
             x = []
 
-            for line in handle:
+            for cnt, line in enumerate(handle):
+
+                if not self.limit is None:
+                    if cnt <= num_lines - self.limit:
+                        continue
+
                 st = line.strip()
                 if st == "":
                     LOGGER.info("skip loading for empty line")
@@ -351,7 +360,7 @@ def make_graph_wrapper(args, fname, listup=0):
         graph_height = args.height
 
     try:
-        loader = CSVFileLoader(os.path.join(args.directory, fname), args.delimiter)
+        loader = CSVFileLoader(os.path.join(args.directory, fname), args.delimiter, args.limit)
         loader.setup_load()
         datum  = loader.load()
     except Exception as ex:
